@@ -142,10 +142,39 @@ function buildPdfLineText(tokens: PdfToken[]): string {
   return output.trim();
 }
 
-function mergePdfLines(lines: PdfLine[]): string {
+function isCodeLikeLine(text: string, averageHeight: number): boolean {
+  if (averageHeight > 9.25) {
+    return false;
+  }
+
+  return (
+    /[{}()[\]=:+]/.test(text) ||
+    /^\.\/\S+/.test(text) ||
+    /^(func|const|var|package|import|type)\b/.test(text) ||
+    /^\w+\s*:=/.test(text) ||
+    /^\w+\s+\w+\s*=/.test(text)
+  );
+}
+
+function isFooterLine(text: string, y: number, pageHeight: number): boolean {
+  const footerCutoff = Math.max(40, pageHeight * 0.1);
+  if (y > footerCutoff) {
+    return false;
+  }
+
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return (
+    /^\d+$/.test(normalized) ||
+    /^\d+\s*\|\s*chapter\b/i.test(normalized) ||
+    /^chapter\s+\d+/i.test(normalized)
+  );
+}
+
+function mergePdfLines(lines: PdfLine[], pageHeight: number): string {
   const rendered = lines
     .map((line) => ({
       ...line,
+      minX: Math.min(...line.tokens.map((token) => token.x)),
       text: buildPdfLineText(
         [...line.tokens].sort((left, right) => {
           if (Math.abs(left.x - right.x) > 1) {
@@ -155,38 +184,63 @@ function mergePdfLines(lines: PdfLine[]): string {
         })
       )
     }))
-    .filter((line) => line.text.length > 0);
+    .filter((line) => line.text.length > 0)
+    .filter((line) => !isFooterLine(line.text, line.y, pageHeight));
 
   if (rendered.length === 0) {
     return "";
   }
 
-  let output = rendered[0].text;
+  let codeBaseX: number | null = null;
+  const formatLineText = (text: string, minX: number, isCode: boolean): string => {
+    if (!isCode) {
+      codeBaseX = null;
+      return text;
+    }
+
+    if (codeBaseX === null || minX < codeBaseX) {
+      codeBaseX = minX;
+    }
+
+    const indentLevel = Math.max(0, Math.min(8, Math.round((minX - codeBaseX) / 14)));
+    return `${"  ".repeat(indentLevel)}${text}`;
+  };
+
+  const firstIsCode = isCodeLikeLine(rendered[0].text, rendered[0].averageHeight);
+  let output = formatLineText(rendered[0].text, rendered[0].minX, firstIsCode);
 
   for (let index = 1; index < rendered.length; index += 1) {
     const previous = rendered[index - 1];
     const current = rendered[index];
+    const previousIsCode = isCodeLikeLine(previous.text, previous.averageHeight);
+    const currentIsCode = isCodeLikeLine(current.text, current.averageHeight);
+    const currentText = formatLineText(current.text, current.minX, currentIsCode);
 
     const verticalGap = previous.y - current.y;
     const baseline = Math.max(8, Math.max(previous.averageHeight, current.averageHeight));
     const largeGap = verticalGap > baseline * 1.9;
     const startsList = /^([\-*•]|\d+[.)])\s/.test(current.text);
+    const indentationJump = Math.abs(current.minX - previous.minX) >= 26;
 
-    if (largeGap) {
+    if (previousIsCode && currentIsCode) {
+      output += "\n";
+    } else if (previousIsCode !== currentIsCode) {
       output += "\n\n";
-    } else if (startsList) {
+    } else if (largeGap) {
+      output += "\n\n";
+    } else if (startsList || indentationJump) {
       output += "\n";
     } else {
       output += " ";
     }
 
-    output += current.text;
+    output += currentText;
   }
 
   return output.replace(/[ \t]+\n/g, "\n").trim();
 }
 
-function extractPdfPageText(textContent: { items: unknown[] }): string {
+function extractPdfPageText(textContent: { items: unknown[] }, pageHeight: number): string {
   const tokens: PdfToken[] = textContent.items
     .map((item, index) => {
       if (!item || typeof item !== "object" || !("str" in item) || typeof item.str !== "string") {
@@ -229,7 +283,7 @@ function extractPdfPageText(textContent: { items: unknown[] }): string {
       return left.index - right.index;
     });
 
-  return mergePdfLines(groupPdfLines(tokens));
+  return mergePdfLines(groupPdfLines(tokens), pageHeight);
 }
 
 async function importTxtOrMd(file: File): Promise<ImportResult> {
@@ -248,8 +302,9 @@ async function importPdf(file: File): Promise<ImportResult> {
 
   for (let index = 1; index <= pdf.numPages; index += 1) {
     const page = await pdf.getPage(index);
+    const viewport = page.getViewport({ scale: 1 });
     const text = await page.getTextContent();
-    const entries = extractPdfPageText(text);
+    const entries = extractPdfPageText(text, viewport.height);
 
     if (entries) {
       pages.push(entries);
