@@ -1,10 +1,17 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+import LandingScreen from "./screens/LandingScreen";
+import LibraryScreen from "./screens/LibraryScreen";
+import ReaderScreen from "./screens/ReaderScreen";
+
 export default function App(): JSX.Element {
   return (
-    <main className="min-h-screen bg-paper text-ink p-6">
-      <h1 className="text-4xl font-ui tracking-tight">Monk</h1>
-      <p className="mt-3 max-w-[36ch] text-sm text-ink-muted">
-        Scaffold ready. Product screens and interactions are implemented in subsequent commits.
-      </p>
-    </main>
+    <div className="min-h-screen bg-paper text-ink font-ui">
+      <Routes>
+        <Route path="/" element={<LandingScreen />} />
+        <Route path="/library" element={<LibraryScreen />} />
+        <Route path="/reader/:documentId" element={<ReaderScreen />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
   );
 }
