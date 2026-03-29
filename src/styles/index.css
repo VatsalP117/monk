@@ -11,6 +11,8 @@
   --reader-ink: #39382a;
   --app-grad-start: #fffdf8;
   --app-grad-end: #efe8d9;
+  --field-bg: #ffffffb8;
+  --field-ring: #d9d4c2;
   --radius: 12px;
 }
 
@@ -23,6 +25,8 @@
   --reader-ink: #39382a;
   --app-grad-start: #fffdf8;
   --app-grad-end: #efe8d9;
+  --field-bg: #ffffffb8;
+  --field-ring: #d9d4c2;
 }
 
 .theme-sepia {
@@ -34,6 +38,8 @@
   --reader-ink: #372d20;
   --app-grad-start: #f7f0e3;
   --app-grad-end: #e2d3b3;
+  --field-bg: #f8efddbc;
+  --field-ring: #c8ba9b;
 }
 
 .theme-dark {
@@ -45,6 +51,8 @@
   --reader-ink: #ececef;
   --app-grad-start: #1d1f22;
   --app-grad-end: #111214;
+  --field-bg: #2f3138d4;
+  --field-ring: #4e5058;
 }
 
 #root {
@@ -90,6 +98,16 @@ body {
 
 .text-theme-ink {
   color: var(--reader-ink);
+}
+
+.surface-input {
+  background-color: var(--field-bg);
+  border: 1px solid var(--field-ring);
+  color: var(--ink);
+}
+
+.surface-input:focus {
+  border-color: var(--ink-muted);
 }
 
 @layer utilities {

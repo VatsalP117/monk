@@ -204,8 +204,8 @@ export default function ReaderScreen(): JSX.Element {
           {content
             .split(/\n{2,}/)
             .filter(Boolean)
-            .map((paragraph) => (
-              <p key={paragraph.slice(0, 40)}>{paragraph}</p>
+            .map((paragraph, index) => (
+              <p key={`${index}-${paragraph.slice(0, 40)}`}>{paragraph}</p>
             ))}
         </div>
       </article>

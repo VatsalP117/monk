@@ -46,7 +46,7 @@ export default function LibraryScreen(): JSX.Element {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search by title"
-            className="w-full rounded-monk bg-[#ffffffb8] px-4 py-3 text-sm text-ink outline-none ring-1 ring-[#d9d4c2] focus:ring-[#8a8a8a]"
+            className="surface-input w-full rounded-monk px-4 py-3 text-sm outline-none"
           />
         </div>
 

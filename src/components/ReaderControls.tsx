@@ -136,7 +136,7 @@ export default function ReaderControls({
               <select
                 value={prefs.ambientPreset}
                 onChange={(event) => onPresetChange(event.target.value as AmbientPreset)}
-                className="mt-2 w-full rounded-monk bg-[#ffffffb8] px-3 py-2 text-sm text-ink ring-1 ring-[#d9d4c2] outline-none"
+                className="surface-input mt-2 w-full rounded-monk px-3 py-2 text-sm outline-none"
               >
                 <option value="rain">Rain</option>
                 <option value="cafe">Cafe</option>

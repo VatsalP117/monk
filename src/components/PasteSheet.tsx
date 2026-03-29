@@ -26,14 +26,14 @@ export default function PasteSheet({ open, importing, onClose, onImport }: Paste
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Title (optional)"
-          className="mt-5 w-full rounded-monk bg-[#ffffffb8] px-4 py-3 text-sm text-ink outline-none ring-1 ring-[#d9d4c2] focus:ring-[#8a8a8a]"
+          className="surface-input mt-5 w-full rounded-monk px-4 py-3 text-sm outline-none"
         />
 
         <textarea
           value={content}
           onChange={(event) => setContent(event.target.value)}
           placeholder="Paste readable text..."
-          className="mt-4 h-64 w-full resize-none rounded-monk bg-[#ffffffb8] px-4 py-4 text-sm leading-6 text-ink outline-none ring-1 ring-[#d9d4c2] focus:ring-[#8a8a8a]"
+          className="surface-input mt-4 h-64 w-full resize-none rounded-monk px-4 py-4 text-sm leading-6 outline-none"
         />
 
         <div className="mt-5 flex items-center justify-end gap-3">
