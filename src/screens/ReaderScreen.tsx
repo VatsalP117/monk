@@ -34,32 +34,34 @@ export default function ReaderScreen(): JSX.Element {
     () => documents.find((entry) => entry.id === params.documentId) ?? null,
     [documents, params.documentId]
   );
+  const documentId = document?.id ?? null;
+  const documentContent = document?.content ?? "";
 
   const pages = useMemo(() => {
-    if (!document) {
+    if (!documentContent) {
       return [];
     }
 
     return paginateContent({
-      content: document.content,
+      content: documentContent,
       prefs,
       viewportHeight
     });
-  }, [document, prefs, viewportHeight]);
+  }, [documentContent, prefs, viewportHeight]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const timeAnchorRef = useRef(Date.now());
 
   useEffect(() => {
     timeAnchorRef.current = Date.now();
-  }, [document?.id]);
+  }, [documentId]);
 
   useEffect(() => {
     const resumedPage =
-      lastSession && lastSession.documentId === document?.id ? lastSession.currentPage : 1;
+      lastSession && lastSession.documentId === documentId ? lastSession.currentPage : 1;
     const nextPage = Math.min(Math.max(resumedPage, 1), Math.max(1, pages.length));
     setCurrentPage(nextPage);
-  }, [document?.id, lastSession?.currentPage, lastSession?.documentId, pages.length]);
+  }, [documentId, lastSession?.currentPage, lastSession?.documentId, pages.length]);
 
   useEffect(() => {
     const onResize = () => setViewportHeight(window.innerHeight);
@@ -75,20 +77,20 @@ export default function ReaderScreen(): JSX.Element {
   useAmbientAudio(prefs.ambientEnabled, prefs.ambientPreset);
 
   useEffect(() => {
-    if (!document || pages.length === 0) {
+    if (!documentId || pages.length === 0) {
       return;
     }
 
     updateReadingSession({
-      documentId: document.id,
+      documentId,
       currentPage,
       totalPages: pages.length,
       deltaTime: 0
     });
-  }, [currentPage, document, pages.length, updateReadingSession]);
+  }, [currentPage, documentId, pages.length, updateReadingSession]);
 
   useEffect(() => {
-    if (!document || pages.length === 0) {
+    if (!documentId || pages.length === 0) {
       return;
     }
 
@@ -98,7 +100,7 @@ export default function ReaderScreen(): JSX.Element {
       timeAnchorRef.current = now;
 
       updateReadingSession({
-        documentId: document.id,
+        documentId,
         currentPage,
         totalPages: pages.length,
         deltaTime
@@ -107,22 +109,12 @@ export default function ReaderScreen(): JSX.Element {
 
     return () => {
       window.clearInterval(intervalId);
-      const now = Date.now();
-      const deltaTime = now - timeAnchorRef.current;
-      timeAnchorRef.current = now;
-
-      updateReadingSession({
-        documentId: document.id,
-        currentPage,
-        totalPages: pages.length,
-        deltaTime
-      });
     };
-  }, [currentPage, document, pages.length, updateReadingSession]);
+  }, [currentPage, documentId, pages.length, updateReadingSession]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!document) {
+      if (!documentId) {
         return;
       }
 
@@ -148,7 +140,7 @@ export default function ReaderScreen(): JSX.Element {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [document, pages.length, ping]);
+  }, [documentId, pages.length, ping]);
 
   if (!document) {
     return (

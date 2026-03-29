@@ -73,32 +73,47 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ prefs: { ...state.prefs, ...patch } }));
       },
       updateReadingSession: ({ documentId, currentPage, totalPages, deltaTime }) => {
-        const now = new Date().toISOString();
+        set((state) => {
+          const elapsed = Math.max(0, deltaTime);
+          const existingSession = state.lastSession;
+          const sameSession =
+            existingSession?.documentId === documentId &&
+            existingSession.currentPage === currentPage &&
+            existingSession.totalPages === totalPages;
 
-        set((state) => ({
-          documents: sortByLastOpened(
-            state.documents.map((item) => {
-              if (item.id !== documentId) {
-                return item;
-              }
-
-              return {
-                ...item,
-                progress: totalPages > 0 ? currentPage / totalPages : item.progress,
-                lastOpenedAt: now
-              };
-            })
-          ),
-          lastSession: {
-            documentId,
-            currentPage,
-            totalPages,
-            timeSpent:
-              (state.lastSession?.documentId === documentId ? state.lastSession.timeSpent : 0) +
-              Math.max(0, deltaTime),
-            lastReadAt: now
+          if (sameSession && elapsed === 0) {
+            return state;
           }
-        }));
+
+          const now = new Date().toISOString();
+          const nextProgress = totalPages > 0 ? Math.min(1, Math.max(0, currentPage / totalPages)) : 0;
+
+          let touched = false;
+          const mapped = state.documents.map((item) => {
+            if (item.id !== documentId) {
+              return item;
+            }
+
+            touched = true;
+            return {
+              ...item,
+              progress: totalPages > 0 ? nextProgress : item.progress,
+              lastOpenedAt: now
+            };
+          });
+
+          return {
+            documents: touched ? sortByLastOpened(mapped) : state.documents,
+            lastSession: {
+              documentId,
+              currentPage,
+              totalPages,
+              timeSpent:
+                (existingSession?.documentId === documentId ? existingSession.timeSpent : 0) + elapsed,
+              lastReadAt: now
+            }
+          };
+        });
       }
     }),
     {
