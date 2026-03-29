@@ -93,7 +93,9 @@ export const useAppStore = create<AppState>()(
             documentId,
             currentPage,
             totalPages,
-            timeSpent: (state.lastSession?.timeSpent ?? 0) + Math.max(0, deltaTime),
+            timeSpent:
+              (state.lastSession?.documentId === documentId ? state.lastSession.timeSpent : 0) +
+              Math.max(0, deltaTime),
             lastReadAt: now
           }
         }));

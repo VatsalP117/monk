@@ -8,16 +8,56 @@
   --paper-strong: #ece9d4;
   --ink: #2c2c2c;
   --ink-muted: #676555;
-  --accent: #5f5e5e;
+  --reader-ink: #39382a;
+  --app-grad-start: #fffdf8;
+  --app-grad-end: #efe8d9;
   --radius: 12px;
+}
+
+.theme-paper {
+  --paper: #f5f1e8;
+  --paper-soft: #fdf9ed;
+  --paper-strong: #ece9d4;
+  --ink: #2c2c2c;
+  --ink-muted: #676555;
+  --reader-ink: #39382a;
+  --app-grad-start: #fffdf8;
+  --app-grad-end: #efe8d9;
+}
+
+.theme-sepia {
+  --paper: #efe4cf;
+  --paper-soft: #f7efdd;
+  --paper-strong: #e6dbc2;
+  --ink: #3a3124;
+  --ink-muted: #7a6f58;
+  --reader-ink: #372d20;
+  --app-grad-start: #f7f0e3;
+  --app-grad-end: #e2d3b3;
+}
+
+.theme-dark {
+  --paper: #1c1c1e;
+  --paper-soft: #2a2a2d;
+  --paper-strong: #35353a;
+  --ink: #e5e5e7;
+  --ink-muted: #a6a6aa;
+  --reader-ink: #ececef;
+  --app-grad-start: #1d1f22;
+  --app-grad-end: #111214;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top left, #fffdf8 0%, var(--paper) 48%, #efe8d9 100%);
+  background: radial-gradient(circle at top left, var(--app-grad-start) 0%, var(--paper) 48%, var(--app-grad-end) 100%);
   color: var(--ink);
+  transition: background-color 220ms ease-out, color 220ms ease-out;
 }
 
 .font-reading {
@@ -46,6 +86,10 @@ body {
 
 .text-ink-muted {
   color: var(--ink-muted);
+}
+
+.text-theme-ink {
+  color: var(--reader-ink);
 }
 
 @layer utilities {
