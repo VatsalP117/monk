@@ -34,6 +34,8 @@ export const useAppStore = create<AppState>()(
           content: document.content,
           format: document.format,
           wordCount: document.wordCount,
+          pageCount: document.pageCount,
+          pdfOutline: document.pdfOutline,
           progress: 0,
           createdAt: now,
           lastOpenedAt: now

@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../state/store";
 import { getWordCount, importFromFile, importFromPastedText } from "../utils/importers";
+import { putPdfBlob } from "../utils/storage/idb";
 
 export function useImportDocument(): {
   importFile: (file: File) => Promise<void>;
@@ -33,10 +34,26 @@ export function useImportDocument(): {
 
       try {
         const imported = await importFromFile(file);
-        if (!imported.content.trim()) {
-          throw new Error("The file has no readable text content.");
+        
+        if (imported.format === "pdf" && imported.pdfBuffer && imported.pageCount) {
+          const wordCount = imported.wordCount ?? 0;
+          const created = addDocument({
+            title: imported.title,
+            content: "",
+            format: "pdf",
+            wordCount,
+            pageCount: imported.pageCount,
+            pdfOutline: imported.pdfOutline
+          });
+          
+          await putPdfBlob(created.id, imported.pdfBuffer, imported.pageCount);
+          navigate(`/reader/${created.id}`);
+        } else {
+          if (!imported.content.trim()) {
+            throw new Error("The file has no readable text content.");
+          }
+          commitImport(imported);
         }
-        commitImport(imported);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Import failed. Please try another file.";
         setImportError(message);
@@ -44,7 +61,7 @@ export function useImportDocument(): {
         setImporting(false);
       }
     },
-    [commitImport, setImportError, setImporting]
+    [commitImport, setImportError, setImporting, addDocument, navigate]
   );
 
   const importPasted = useCallback(

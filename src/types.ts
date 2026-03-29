@@ -4,6 +4,12 @@ export type ReaderTheme = "paper" | "sepia" | "dark";
 
 export type AmbientPreset = "rain" | "cafe" | "white";
 
+export interface PdfOutlineItem {
+  title: string;
+  dest: unknown;
+  items: PdfOutlineItem[];
+}
+
 export interface DocumentRecord {
   id: string;
   title: string;
@@ -13,6 +19,8 @@ export interface DocumentRecord {
   lastOpenedAt: string;
   createdAt: string;
   wordCount: number;
+  pageCount?: number;
+  pdfOutline?: PdfOutlineItem[];
 }
 
 export interface ReadingSession {
@@ -56,4 +64,8 @@ export interface ImportResult {
   title: string;
   content: string;
   format: DocumentFormat;
+  wordCount?: number;
+  pageCount?: number;
+  pdfOutline?: PdfOutlineItem[];
+  pdfBuffer?: ArrayBuffer;
 }

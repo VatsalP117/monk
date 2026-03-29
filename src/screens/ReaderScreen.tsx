@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import PageIndicator from "../components/PageIndicator";
+import PdfViewer from "../components/PdfViewer";
 import ReaderControls from "../components/ReaderControls";
 import { useAmbientAudio } from "../hooks/useAmbientAudio";
 import { useIdleVisibility } from "../hooks/useIdleVisibility";
@@ -32,13 +33,15 @@ export default function ReaderScreen(): JSX.Element {
 
   const document = useMemo(
     () => documents.find((entry) => entry.id === params.documentId) ?? null,
-    [documents, params.documentId]
+    [documents, params]
   );
   const documentId = document?.id ?? null;
   const documentContent = document?.content ?? "";
+  const documentFormat = document?.format;
+  const pageCount = document?.pageCount;
 
   const pages = useMemo(() => {
-    if (!documentContent) {
+    if (!documentContent || documentFormat === "pdf") {
       return [];
     }
 
@@ -47,9 +50,10 @@ export default function ReaderScreen(): JSX.Element {
       prefs,
       viewportHeight
     });
-  }, [documentContent, prefs, viewportHeight]);
+  }, [documentContent, documentFormat, prefs, viewportHeight]);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [pdfPage, setPdfPage] = useState(1);
   const timeAnchorRef = useRef(Date.now());
 
   useEffect(() => {
@@ -57,11 +61,15 @@ export default function ReaderScreen(): JSX.Element {
   }, [documentId]);
 
   useEffect(() => {
-    const resumedPage =
-      lastSession && lastSession.documentId === documentId ? lastSession.currentPage : 1;
-    const nextPage = Math.min(Math.max(resumedPage, 1), Math.max(1, pages.length));
-    setCurrentPage(nextPage);
-  }, [documentId, lastSession?.currentPage, lastSession?.documentId, pages.length]);
+    if (documentFormat === "pdf" && pageCount) {
+      const resumedPage = lastSession?.documentId === documentId ? lastSession.currentPage : 1;
+      setPdfPage(Math.min(Math.max(resumedPage, 1), pageCount));
+    } else {
+      const resumedPage =
+        lastSession && lastSession.documentId === documentId ? lastSession.currentPage : 1;
+      setCurrentPage(Math.min(Math.max(resumedPage, 1), Math.max(1, pages.length)));
+    }
+  }, [documentId, lastSession, pages.length, documentFormat, pageCount]);
 
   useEffect(() => {
     const onResize = () => setViewportHeight(window.innerHeight);
@@ -77,20 +85,23 @@ export default function ReaderScreen(): JSX.Element {
   useAmbientAudio(prefs.ambientEnabled, prefs.ambientPreset);
 
   useEffect(() => {
-    if (!documentId || pages.length === 0) {
+    if (!documentId) {
       return;
     }
 
+    const totalPages = documentFormat === "pdf" ? (pageCount ?? 1) : pages.length;
+    const page = documentFormat === "pdf" ? pdfPage : currentPage;
+
     updateReadingSession({
       documentId,
-      currentPage,
-      totalPages: pages.length,
+      currentPage: page,
+      totalPages,
       deltaTime: 0
     });
-  }, [currentPage, documentId, pages.length, updateReadingSession]);
+  }, [documentId, documentFormat, pageCount, pages.length, currentPage, pdfPage, updateReadingSession]);
 
   useEffect(() => {
-    if (!documentId || pages.length === 0) {
+    if (!documentId) {
       return;
     }
 
@@ -99,10 +110,13 @@ export default function ReaderScreen(): JSX.Element {
       const deltaTime = now - timeAnchorRef.current;
       timeAnchorRef.current = now;
 
+      const totalPages = documentFormat === "pdf" ? (pageCount ?? 1) : pages.length;
+      const page = documentFormat === "pdf" ? pdfPage : currentPage;
+
       updateReadingSession({
         documentId,
-        currentPage,
-        totalPages: pages.length,
+        currentPage: page,
+        totalPages,
         deltaTime
       });
     }, 15000);
@@ -110,7 +124,7 @@ export default function ReaderScreen(): JSX.Element {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [currentPage, documentId, pages.length, updateReadingSession]);
+  }, [documentId, documentFormat, pageCount, pages.length, currentPage, pdfPage, updateReadingSession]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -118,16 +132,30 @@ export default function ReaderScreen(): JSX.Element {
         return;
       }
 
-      if (["ArrowRight", "PageDown", "ArrowDown", " "].includes(event.key)) {
-        event.preventDefault();
-        setCurrentPage((previous) => Math.min(pages.length, previous + 1));
-        ping();
-      }
+      if (documentFormat === "pdf") {
+        if (["ArrowRight", "PageDown", "ArrowDown", " "].includes(event.key)) {
+          event.preventDefault();
+          setPdfPage((p) => Math.min(pageCount ?? 1, p + 1));
+          ping();
+        }
 
-      if (["ArrowLeft", "PageUp", "ArrowUp"].includes(event.key)) {
-        event.preventDefault();
-        setCurrentPage((previous) => Math.max(1, previous - 1));
-        ping();
+        if (["ArrowLeft", "PageUp", "ArrowUp"].includes(event.key)) {
+          event.preventDefault();
+          setPdfPage((p) => Math.max(1, p - 1));
+          ping();
+        }
+      } else {
+        if (["ArrowRight", "PageDown", "ArrowDown", " "].includes(event.key)) {
+          event.preventDefault();
+          setCurrentPage((previous) => Math.min(pages.length, previous + 1));
+          ping();
+        }
+
+        if (["ArrowLeft", "PageUp", "ArrowUp"].includes(event.key)) {
+          event.preventDefault();
+          setCurrentPage((previous) => Math.max(1, previous - 1));
+          ping();
+        }
       }
 
       if (event.key.toLowerCase() === "a") {
@@ -140,7 +168,7 @@ export default function ReaderScreen(): JSX.Element {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [documentId, pages.length, ping]);
+  }, [documentId, documentFormat, pageCount, pages.length, ping]);
 
   if (!document) {
     return (
@@ -163,6 +191,35 @@ export default function ReaderScreen(): JSX.Element {
           </div>
         </section>
       </main>
+    );
+  }
+
+  if (documentFormat === "pdf") {
+    return (
+      <>
+        <div onMouseMove={ping}>
+          <ReaderControls
+            visible={visible}
+            settingsOpen={settingsOpen}
+            prefs={prefs}
+            onBack={() => navigate("/library")}
+            onToggleSettings={() => setSettingsOpen((previous) => !previous)}
+            onThemeCycle={() => setPrefs({ theme: cycleTheme(prefs.theme) })}
+            onAmbientToggle={() => setPrefs({ ambientEnabled: !prefs.ambientEnabled })}
+            onPresetChange={(value) => setPrefs({ ambientPreset: value })}
+            onFontSizeChange={(value) => setPrefs({ fontSize: value })}
+            onLineHeightChange={(value) => setPrefs({ lineHeight: value })}
+            onColumnWidthChange={(value) => setPrefs({ columnWidth: value })}
+          />
+          <PdfViewer
+            documentId={document.id}
+            currentPage={pdfPage}
+            onPageChange={setPdfPage}
+            theme={prefs.theme}
+          />
+        </div>
+        <PageIndicator currentPage={pdfPage} totalPages={pageCount ?? 1} visible={visible || settingsOpen} />
+      </>
     );
   }
 
