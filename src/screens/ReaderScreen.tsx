@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import PageIndicator from "../components/PageIndicator";
-import PdfViewer from "../components/PdfViewer";
 import ReaderControls from "../components/ReaderControls";
 import { useAmbientAudio } from "../hooks/useAmbientAudio";
 import { useIdleVisibility } from "../hooks/useIdleVisibility";
@@ -37,11 +36,9 @@ export default function ReaderScreen(): JSX.Element {
   );
   const documentId = document?.id ?? null;
   const documentContent = document?.content ?? "";
-  const documentFormat = document?.format;
-  const pageCount = document?.pageCount;
 
   const pages = useMemo(() => {
-    if (!documentContent || documentFormat === "pdf") {
+    if (!documentContent) {
       return [];
     }
 
@@ -50,10 +47,9 @@ export default function ReaderScreen(): JSX.Element {
       prefs,
       viewportHeight
     });
-  }, [documentContent, documentFormat, prefs, viewportHeight]);
+  }, [documentContent, prefs, viewportHeight]);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pdfPage, setPdfPage] = useState(1);
   const timeAnchorRef = useRef(Date.now());
 
   useEffect(() => {
@@ -61,15 +57,10 @@ export default function ReaderScreen(): JSX.Element {
   }, [documentId]);
 
   useEffect(() => {
-    if (documentFormat === "pdf" && pageCount) {
-      const resumedPage = lastSession?.documentId === documentId ? lastSession.currentPage : 1;
-      setPdfPage(Math.min(Math.max(resumedPage, 1), pageCount));
-    } else {
-      const resumedPage =
-        lastSession && lastSession.documentId === documentId ? lastSession.currentPage : 1;
-      setCurrentPage(Math.min(Math.max(resumedPage, 1), Math.max(1, pages.length)));
-    }
-  }, [documentId, lastSession, pages.length, documentFormat, pageCount]);
+    const resumedPage =
+      lastSession && lastSession.documentId === documentId ? lastSession.currentPage : 1;
+    setCurrentPage(Math.min(Math.max(resumedPage, 1), Math.max(1, pages.length)));
+  }, [documentId, lastSession, pages.length]);
 
   useEffect(() => {
     const onResize = () => setViewportHeight(window.innerHeight);
@@ -89,16 +80,15 @@ export default function ReaderScreen(): JSX.Element {
       return;
     }
 
-    const totalPages = documentFormat === "pdf" ? (pageCount ?? 1) : pages.length;
-    const page = documentFormat === "pdf" ? pdfPage : currentPage;
+    const totalPages = Math.max(1, pages.length);
 
     updateReadingSession({
       documentId,
-      currentPage: page,
+      currentPage,
       totalPages,
       deltaTime: 0
     });
-  }, [documentId, documentFormat, pageCount, pages.length, currentPage, pdfPage, updateReadingSession]);
+  }, [documentId, pages.length, currentPage, updateReadingSession]);
 
   useEffect(() => {
     if (!documentId) {
@@ -110,12 +100,11 @@ export default function ReaderScreen(): JSX.Element {
       const deltaTime = now - timeAnchorRef.current;
       timeAnchorRef.current = now;
 
-      const totalPages = documentFormat === "pdf" ? (pageCount ?? 1) : pages.length;
-      const page = documentFormat === "pdf" ? pdfPage : currentPage;
+      const totalPages = Math.max(1, pages.length);
 
       updateReadingSession({
         documentId,
-        currentPage: page,
+        currentPage,
         totalPages,
         deltaTime
       });
@@ -124,7 +113,7 @@ export default function ReaderScreen(): JSX.Element {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [documentId, documentFormat, pageCount, pages.length, currentPage, pdfPage, updateReadingSession]);
+  }, [documentId, pages.length, currentPage, updateReadingSession]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -132,30 +121,18 @@ export default function ReaderScreen(): JSX.Element {
         return;
       }
 
-      if (documentFormat === "pdf") {
-        if (["ArrowRight", "PageDown", "ArrowDown", " "].includes(event.key)) {
-          event.preventDefault();
-          setPdfPage((p) => Math.min(pageCount ?? 1, p + 1));
-          ping();
-        }
+      const totalPages = Math.max(1, pages.length);
 
-        if (["ArrowLeft", "PageUp", "ArrowUp"].includes(event.key)) {
-          event.preventDefault();
-          setPdfPage((p) => Math.max(1, p - 1));
-          ping();
-        }
-      } else {
-        if (["ArrowRight", "PageDown", "ArrowDown", " "].includes(event.key)) {
-          event.preventDefault();
-          setCurrentPage((previous) => Math.min(pages.length, previous + 1));
-          ping();
-        }
+      if (["ArrowRight", "PageDown", "ArrowDown", " "].includes(event.key)) {
+        event.preventDefault();
+        setCurrentPage((previous) => Math.min(totalPages, previous + 1));
+        ping();
+      }
 
-        if (["ArrowLeft", "PageUp", "ArrowUp"].includes(event.key)) {
-          event.preventDefault();
-          setCurrentPage((previous) => Math.max(1, previous - 1));
-          ping();
-        }
+      if (["ArrowLeft", "PageUp", "ArrowUp"].includes(event.key)) {
+        event.preventDefault();
+        setCurrentPage((previous) => Math.max(1, previous - 1));
+        ping();
       }
 
       if (event.key.toLowerCase() === "a") {
@@ -168,7 +145,7 @@ export default function ReaderScreen(): JSX.Element {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [documentId, documentFormat, pageCount, pages.length, ping]);
+  }, [documentId, pages.length, ping]);
 
   if (!document) {
     return (
@@ -191,35 +168,6 @@ export default function ReaderScreen(): JSX.Element {
           </div>
         </section>
       </main>
-    );
-  }
-
-  if (documentFormat === "pdf") {
-    return (
-      <>
-        <div onMouseMove={ping}>
-          <ReaderControls
-            visible={visible}
-            settingsOpen={settingsOpen}
-            prefs={prefs}
-            onBack={() => navigate("/library")}
-            onToggleSettings={() => setSettingsOpen((previous) => !previous)}
-            onThemeCycle={() => setPrefs({ theme: cycleTheme(prefs.theme) })}
-            onAmbientToggle={() => setPrefs({ ambientEnabled: !prefs.ambientEnabled })}
-            onPresetChange={(value) => setPrefs({ ambientPreset: value })}
-            onFontSizeChange={(value) => setPrefs({ fontSize: value })}
-            onLineHeightChange={(value) => setPrefs({ lineHeight: value })}
-            onColumnWidthChange={(value) => setPrefs({ columnWidth: value })}
-          />
-          <PdfViewer
-            documentId={document.id}
-            currentPage={pdfPage}
-            onPageChange={setPdfPage}
-            theme={prefs.theme}
-          />
-        </div>
-        <PageIndicator currentPage={pdfPage} totalPages={pageCount ?? 1} visible={visible || settingsOpen} />
-      </>
     );
   }
 
@@ -259,7 +207,11 @@ export default function ReaderScreen(): JSX.Element {
         </div>
       </article>
 
-      <PageIndicator currentPage={currentPage} totalPages={pages.length} visible={visible || settingsOpen} />
+      <PageIndicator
+        currentPage={currentPage}
+        totalPages={Math.max(1, pages.length)}
+        visible={true}
+      />
     </main>
   );
 }

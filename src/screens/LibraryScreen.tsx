@@ -76,7 +76,7 @@ export default function LibraryScreen(): JSX.Element {
             No documents yet. Import one to start reading.
           </div>
         ) : (
-          <section className="mt-8 space-y-4">
+          <section className="mt-8 space-y-11">
             {filtered.map((document) => (
               <DocumentListItem
                 key={document.id}

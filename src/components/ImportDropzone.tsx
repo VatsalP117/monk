@@ -47,13 +47,13 @@ export default function ImportDropzone({
         >
           {importing ? "Processing..." : "Choose File"}
         </button>
-        <span className="text-xs uppercase tracking-[0.16em] text-ink-muted">TXT · MD · PDF · EPUB</span>
+        <span className="text-xs uppercase tracking-[0.16em] text-ink-muted">TXT · MD · EPUB</span>
       </div>
 
       <input
         ref={inputRef}
         type="file"
-        accept=".txt,.md,.pdf,.epub"
+        accept=".txt,.md,.epub"
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];

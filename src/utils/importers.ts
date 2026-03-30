@@ -1,7 +1,6 @@
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 import type { ImportResult } from "../types";
-import { importPdfFile } from "./pdf/importPdf";
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -62,10 +61,6 @@ async function importTxtOrMd(file: File): Promise<ImportResult> {
     content,
     format: file.name.toLowerCase().endsWith(".md") ? "md" : "txt"
   };
-}
-
-async function importPdf(file: File): Promise<ImportResult> {
-  return importPdfFile(file, stripExtension(file.name));
 }
 
 async function importEpub(file: File): Promise<ImportResult> {
@@ -134,15 +129,11 @@ export async function importFromFile(file: File): Promise<ImportResult> {
     return importTxtOrMd(file);
   }
 
-  if (lowerName.endsWith(".pdf")) {
-    return importPdf(file);
-  }
-
   if (lowerName.endsWith(".epub")) {
     return importEpub(file);
   }
 
-  throw new Error("Unsupported file type. Use TXT, MD, PDF, or EPUB.");
+  throw new Error("Unsupported file type. Use TXT, MD, or EPUB.");
 }
 
 export function importFromPastedText(payload: { title: string; content: string }): ImportResult {

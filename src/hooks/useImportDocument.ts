@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../state/store";
 import { getWordCount, importFromFile, importFromPastedText } from "../utils/importers";
-import { putPdfBlob } from "../utils/storage/idb";
 
 export function useImportDocument(): {
   importFile: (file: File) => Promise<void>;
@@ -14,7 +13,7 @@ export function useImportDocument(): {
   const setImportError = useAppStore((state) => state.setImportError);
 
   const commitImport = useCallback(
-    (payload: { title: string; content: string; format: "txt" | "md" | "pdf" | "epub" | "paste" }) => {
+    (payload: { title: string; content: string; format: "txt" | "md" | "epub" | "paste" }) => {
       const wordCount = getWordCount(payload.content);
       const created = addDocument({
         title: payload.title,
@@ -34,26 +33,12 @@ export function useImportDocument(): {
 
       try {
         const imported = await importFromFile(file);
-        
-        if (imported.format === "pdf" && imported.pdfBuffer && imported.pageCount) {
-          const wordCount = imported.wordCount ?? 0;
-          const created = addDocument({
-            title: imported.title,
-            content: "",
-            format: "pdf",
-            wordCount,
-            pageCount: imported.pageCount,
-            pdfOutline: imported.pdfOutline
-          });
-          
-          await putPdfBlob(created.id, imported.pdfBuffer, imported.pageCount);
-          navigate(`/reader/${created.id}`);
-        } else {
-          if (!imported.content.trim()) {
-            throw new Error("The file has no readable text content.");
-          }
-          commitImport(imported);
+
+        if (!imported.content.trim()) {
+          throw new Error("The file has no readable text content.");
         }
+
+        commitImport(imported);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Import failed. Please try another file.";
         setImportError(message);
@@ -61,7 +46,7 @@ export function useImportDocument(): {
         setImporting(false);
       }
     },
-    [commitImport, setImportError, setImporting, addDocument, navigate]
+    [commitImport, setImportError, setImporting]
   );
 
   const importPasted = useCallback(
