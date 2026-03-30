@@ -16,7 +16,6 @@ Supported import formats (current):
 
 - `.txt`
 - `.md`
-- `.pdf`
 - `.epub`
 - pasted text
 
@@ -59,7 +58,6 @@ Supported import formats (current):
 - Tailwind CSS
 - Zustand (with persistence)
 - Tauri 2 (desktop shell)
-- `pdfjs-dist` for PDF extraction
 - `jszip` + `fast-xml-parser` for EPUB extraction
 
 ## Architecture Overview
@@ -99,33 +97,6 @@ Persistence:
 - Entry point: `src/utils/importers.ts`
 - TXT/MD: plain text read
 - EPUB: unzip + OPF/spine parsing + HTML to text extraction
-- PDF: delegated to dedicated PDF module (`src/utils/pdf`)
-
-## PDF Subsystem (Separated for Iteration)
-
-PDF logic is intentionally isolated to make debugging and feature work easier.
-
-- `src/utils/pdf/importPdf.ts`
-  - loads document with `pdfjs-dist`
-  - iterates pages
-  - calls page extractor
-- `src/utils/pdf/extractPageText.ts`
-  - tokenization from PDF text items
-  - line grouping by vertical proximity
-  - in-line spacing reconstruction by x-position deltas
-  - code-line detection and indentation preservation
-  - footer filtering (page-number/chapter footer noise)
-  - paragraph and block merge heuristics
-- `src/utils/pdf/types.ts`
-  - PDF-specific token/line contracts
-
-This split is the right place to add upcoming PDF work, such as:
-
-- header/footer templates per publisher
-- two-column detection
-- table-aware extraction
-- per-book parsing profiles
-- extraction diagnostics and debug traces
 
 ## Project Layout
 
@@ -140,10 +111,6 @@ src/
     importers.ts
     pagination.ts
     date.ts
-    pdf/
-      importPdf.ts
-      extractPageText.ts
-      types.ts
 src-tauri/
   src/
   tauri.conf.json
@@ -207,17 +174,15 @@ Expected macOS output:
 ## Notes for Testing Import Changes
 
 Imported document content is stored in app state.
-If parser behavior changes (especially PDF), re-import the source file to evaluate new parsing output.
+If parser behavior changes, re-import the source file to evaluate new parsing output.
 
 ## Known Constraints
 
-- PDF extraction uses heuristics; complex layouts (multi-column, dense tables, heavy scans) still need targeted handling.
 - Reader pagination is character/viewport heuristic-based and can shift with typography settings.
-- Bundle size is currently large due to PDF worker inclusion.
+- PDF import is temporarily disabled in the app while parser integration moves to an external service that will return markdown.
 
 ## Suggested Next Work
 
-- Add PDF debug mode with page-level extraction snapshots.
-- Add layout-classifier stage before merge heuristics.
-- Add per-document parser metadata to avoid full reparse when only reader settings change.
-- Move parser constants to a config object and expose safe tuning toggles in development.
+- Integrate external PDF-to-markdown service in the import pipeline.
+- Add parser failure handling and retry UX for external PDF jobs.
+- Persist source metadata for imported markdown to support re-sync/update workflows.

@@ -46,7 +46,7 @@ export default function ReaderControls({
           controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        <div className="flex w-full max-w-4xl items-center justify-between rounded-monk bg-paper-soft/70 px-3 py-2 shadow-glass backdrop-blur-xl">
+        <div className="flex w-full max-w-4xl items-center justify-between rounded-monk bg-paper-strong/60 px-3 py-2 shadow-glass backdrop-blur-[20px]">
           <button
             type="button"
             onClick={onBack}
@@ -85,7 +85,7 @@ export default function ReaderControls({
       </div>
 
       {settingsOpen ? (
-        <aside className="fixed right-5 top-[84px] z-40 w-[320px] rounded-monk bg-paper-soft/95 p-4 shadow-glass backdrop-blur-xl">
+        <aside className="fixed right-5 top-[84px] z-40 w-[320px] rounded-monk bg-paper-strong/60 p-4 shadow-glass backdrop-blur-[20px]">
           <h3 className="font-reading text-xl text-ink">Reading Settings</h3>
 
           <div className="mt-4 space-y-4 text-sm text-ink">

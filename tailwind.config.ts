@@ -8,8 +8,8 @@ const config: Config = {
         monk: "12px"
       },
       boxShadow: {
-        monk: "0 18px 48px rgba(57, 56, 42, 0.08)",
-        glass: "0 12px 40px rgba(57, 56, 42, 0.08)"
+        monk: "0 18px 48px rgba(57, 56, 42, 0.04)",
+        glass: "0 8px 48px rgba(57, 56, 42, 0.04)"
       },
       transitionDuration: {
         180: "180ms",
