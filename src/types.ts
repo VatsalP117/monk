@@ -1,4 +1,4 @@
-export type DocumentFormat = "txt" | "md" | "epub" | "paste";
+export type DocumentFormat = "txt" | "md" | "epub" | "paste" | "pdf";
 
 export type ReaderTheme = "paper" | "sepia" | "dark";
 
@@ -9,10 +9,31 @@ export interface DocumentRecord {
   title: string;
   content: string;
   format: DocumentFormat;
+  markdownPages?: string[];
+  sourceMeta?: DocumentSourceMeta;
   progress: number;
   lastOpenedAt: string;
   createdAt: string;
   wordCount: number;
+}
+
+export interface PdfImportStats {
+  pageCount: number;
+  processingTimeS?: number;
+  llmProvider?: string;
+  llmCleaned?: number;
+  llmFailed?: number;
+  badPages?: number;
+  goodPages?: number;
+  locallyRefined?: number;
+}
+
+export interface DocumentSourceMeta {
+  originalFileName?: string;
+  fileSizeBytes?: number;
+  importedAt?: string;
+  warnings?: string[];
+  pdf?: PdfImportStats;
 }
 
 export interface ReadingSession {
@@ -39,10 +60,14 @@ export interface AppState {
   prefs: ReaderPreferences;
   importing: boolean;
   importError: string | null;
+  importStatus: string | null;
+  importWarning: string | null;
   addDocument: (document: Omit<DocumentRecord, "id" | "createdAt" | "lastOpenedAt" | "progress">) => DocumentRecord;
   deleteDocument: (documentId: string) => void;
   setImporting: (value: boolean) => void;
   setImportError: (value: string | null) => void;
+  setImportStatus: (value: string | null) => void;
+  setImportWarning: (value: string | null) => void;
   setPrefs: (patch: Partial<ReaderPreferences>) => void;
   updateReadingSession: (payload: {
     documentId: string;
@@ -57,4 +82,7 @@ export interface ImportResult {
   content: string;
   format: DocumentFormat;
   wordCount?: number;
+  markdownPages?: string[];
+  sourceMeta?: DocumentSourceMeta;
+  warning?: string | null;
 }

@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 import type { ImportResult } from "../types";
+import { importPdfWithService } from "./pdfExtractClient";
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -122,7 +123,12 @@ async function importEpub(file: File): Promise<ImportResult> {
   };
 }
 
-export async function importFromFile(file: File): Promise<ImportResult> {
+export interface FileImportOptions {
+  signal?: AbortSignal;
+  onStatus?: (status: string) => void;
+}
+
+export async function importFromFile(file: File, options?: FileImportOptions): Promise<ImportResult> {
   const lowerName = file.name.toLowerCase();
 
   if (lowerName.endsWith(".txt") || lowerName.endsWith(".md")) {
@@ -133,7 +139,11 @@ export async function importFromFile(file: File): Promise<ImportResult> {
     return importEpub(file);
   }
 
-  throw new Error("Unsupported file type. Use TXT, MD, or EPUB.");
+  if (lowerName.endsWith(".pdf")) {
+    return importPdfWithService(file, options);
+  }
+
+  throw new Error("Unsupported file type. Use TXT, MD, EPUB, or PDF.");
 }
 
 export function importFromPastedText(payload: { title: string; content: string }): ImportResult {
