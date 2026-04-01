@@ -14,6 +14,8 @@ export default function LibraryScreen(): JSX.Element {
   const deleteDocument = useAppStore((state) => state.deleteDocument);
   const importing = useAppStore((state) => state.importing);
   const importError = useAppStore((state) => state.importError);
+  const importStatus = useAppStore((state) => state.importStatus);
+  const importWarning = useAppStore((state) => state.importWarning);
   const { importFile, importPasted } = useImportDocument();
 
   const filtered = useMemo(() => {
@@ -70,6 +72,8 @@ export default function LibraryScreen(): JSX.Element {
         </div>
 
         {importError ? <p className="mt-4 text-sm text-[#742410]">{importError}</p> : null}
+        {importWarning ? <p className="mt-3 text-sm text-ink-muted">{importWarning}</p> : null}
+        {importing && importStatus ? <p className="mt-3 text-sm text-ink-muted">{importStatus}</p> : null}
 
         {filtered.length === 0 ? (
           <div className="mt-10 rounded-monk bg-paper-soft p-8 text-center text-sm text-ink-muted">

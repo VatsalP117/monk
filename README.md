@@ -17,6 +17,7 @@ Supported import formats (current):
 - `.txt`
 - `.md`
 - `.epub`
+- `.pdf` (via `monk-pdf-extract` service)
 - pasted text
 
 ## Core Features
@@ -146,6 +147,13 @@ Web app URL:
 
 - `http://localhost:1420/`
 
+If you want PDF import in development, also run the extraction service:
+
+```bash
+cd ../monk-pdf-extract
+uvicorn server:app --reload --host 0.0.0.0 --port 7788
+```
+
 ### Desktop Debug Mode (Tauri)
 
 ```bash
@@ -179,7 +187,7 @@ If parser behavior changes, re-import the source file to evaluate new parsing ou
 ## Known Constraints
 
 - Reader pagination is character/viewport heuristic-based and can shift with typography settings.
-- PDF import is temporarily disabled in the app while parser integration moves to an external service that will return markdown.
+- PDF import requires the extraction service to be reachable at `VITE_PDF_EXTRACT_URL` (defaults to `http://localhost:7788`).
 
 ## Suggested Next Work
 

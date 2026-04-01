@@ -110,6 +110,114 @@ body {
   border-color: var(--ink-muted);
 }
 
+.prose-monk {
+  color: var(--reader-ink);
+}
+
+.prose-monk > :first-child {
+  margin-top: 0;
+}
+
+.prose-monk > :last-child {
+  margin-bottom: 0;
+}
+
+.prose-monk h1,
+.prose-monk h2,
+.prose-monk h3,
+.prose-monk h4 {
+  color: var(--ink);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 1.4em 0 0.6em;
+}
+
+.prose-monk h1 {
+  font-size: 1.8em;
+}
+
+.prose-monk h2 {
+  font-size: 1.55em;
+}
+
+.prose-monk h3 {
+  font-size: 1.25em;
+}
+
+.prose-monk p {
+  margin: 0.95em 0;
+}
+
+.prose-monk ul,
+.prose-monk ol {
+  margin: 1em 0;
+  padding-left: 1.2em;
+}
+
+.prose-monk li + li {
+  margin-top: 0.35em;
+}
+
+.prose-monk blockquote {
+  margin: 1.2em 0;
+  padding: 0.5em 0 0.5em 1em;
+  background-color: var(--paper-soft);
+  border-radius: var(--radius);
+}
+
+.prose-monk pre {
+  margin: 1.2em 0;
+  padding: 0.9em 1em;
+  border-radius: var(--radius);
+  background-color: var(--paper-strong);
+  overflow-x: auto;
+}
+
+.prose-monk code {
+  font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 0.86em;
+}
+
+.prose-monk :not(pre) > code {
+  background-color: var(--paper-strong);
+  border-radius: 6px;
+  padding: 0.15em 0.35em;
+}
+
+.prose-monk table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1.3em 0;
+  background-color: var(--paper-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.prose-monk th,
+.prose-monk td {
+  text-align: left;
+  padding: 0.55em 0.7em;
+  font-size: 0.86em;
+}
+
+.prose-monk thead th {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.prose-monk tbody tr:nth-child(even) {
+  background-color: var(--paper-strong);
+}
+
+.prose-monk hr {
+  margin: 1.3em 0;
+  border: 0;
+  height: 1px;
+  background-color: var(--field-ring);
+}
+
 @layer utilities {
   .fade-smooth {
     transition-duration: 220ms;

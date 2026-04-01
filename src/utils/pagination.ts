@@ -13,6 +13,41 @@ function estimateCharactersPerPage(input: PaginationInput): number {
   return Math.max(900, Math.floor(charsPerLine * linesPerPage * 0.92));
 }
 
+function splitIntoReadableBlocks(content: string): string[] {
+  const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = normalized.split("\n");
+  const blocks: string[] = [];
+  let current: string[] = [];
+  let inCodeFence = false;
+
+  const flushCurrent = () => {
+    const block = current.join("\n").trim();
+    if (block) {
+      blocks.push(block);
+    }
+    current = [];
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      inCodeFence = !inCodeFence;
+      current.push(line);
+      return;
+    }
+
+    if (!inCodeFence && trimmed.length === 0) {
+      flushCurrent();
+      return;
+    }
+
+    current.push(line);
+  });
+
+  flushCurrent();
+  return blocks.length > 0 ? blocks : [normalized.trim()];
+}
+
 export function paginateContent(input: PaginationInput): string[] {
   const trimmed = input.content.trim();
   if (!trimmed) {
@@ -20,49 +55,36 @@ export function paginateContent(input: PaginationInput): string[] {
   }
 
   const maxChars = estimateCharactersPerPage(input);
-  const paragraphs = trimmed
-    .replace(/\r\n/g, "\n")
-    .split(/\n{2,}/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
+  const blocks = splitIntoReadableBlocks(trimmed);
   const pages: string[] = [];
-  let current = "";
+  let currentBlocks: string[] = [];
+  let currentLength = 0;
 
-  paragraphs.forEach((paragraph) => {
-    const candidate = current ? `${current}\n\n${paragraph}` : paragraph;
-    if (candidate.length <= maxChars) {
-      current = candidate;
+  blocks.forEach((block) => {
+    const nextLength = currentLength > 0 ? currentLength + 2 + block.length : block.length;
+    if (nextLength <= maxChars) {
+      currentBlocks.push(block);
+      currentLength = nextLength;
       return;
     }
 
-    if (current) {
-      pages.push(current);
-      current = "";
+    if (currentBlocks.length > 0) {
+      pages.push(currentBlocks.join("\n\n"));
+      currentBlocks = [];
+      currentLength = 0;
     }
 
-    if (paragraph.length <= maxChars) {
-      current = paragraph;
+    if (block.length > maxChars) {
+      pages.push(block);
       return;
     }
 
-    const words = paragraph.split(/\s+/);
-    let chunk = "";
-    words.forEach((word) => {
-      const nextChunk = chunk ? `${chunk} ${word}` : word;
-      if (nextChunk.length > maxChars) {
-        pages.push(chunk);
-        chunk = word;
-      } else {
-        chunk = nextChunk;
-      }
-    });
-
-    current = chunk;
+    currentBlocks = [block];
+    currentLength = block.length;
   });
 
-  if (current) {
-    pages.push(current);
+  if (currentBlocks.length > 0) {
+    pages.push(currentBlocks.join("\n\n"));
   }
 
   return pages.length > 0 ? pages : [trimmed];

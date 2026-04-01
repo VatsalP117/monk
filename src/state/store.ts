@@ -26,6 +26,8 @@ export const useAppStore = create<AppState>()(
       prefs: DEFAULT_PREFS,
       importing: false,
       importError: null,
+      importStatus: null,
+      importWarning: null,
       addDocument: (document) => {
         const now = new Date().toISOString();
         const created: DocumentRecord = {
@@ -33,6 +35,8 @@ export const useAppStore = create<AppState>()(
           title: document.title,
           content: document.content,
           format: document.format,
+          markdownPages: document.markdownPages,
+          sourceMeta: document.sourceMeta,
           wordCount: document.wordCount,
           progress: 0,
           createdAt: now,
@@ -68,6 +72,12 @@ export const useAppStore = create<AppState>()(
       },
       setImportError: (value) => {
         set({ importError: value });
+      },
+      setImportStatus: (value) => {
+        set({ importStatus: value });
+      },
+      setImportWarning: (value) => {
+        set({ importWarning: value });
       },
       setPrefs: (patch) => {
         set((state) => ({ prefs: { ...state.prefs, ...patch } }));

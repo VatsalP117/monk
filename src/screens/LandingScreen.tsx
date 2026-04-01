@@ -13,6 +13,8 @@ export default function LandingScreen(): JSX.Element {
   const lastSession = useAppStore((state) => state.lastSession);
   const importing = useAppStore((state) => state.importing);
   const importError = useAppStore((state) => state.importError);
+  const importStatus = useAppStore((state) => state.importStatus);
+  const importWarning = useAppStore((state) => state.importWarning);
   const { importFile, importPasted } = useImportDocument();
 
   const lastDocument = useMemo(
@@ -66,6 +68,8 @@ export default function LandingScreen(): JSX.Element {
           </div>
 
           {importError ? <p className="mt-4 text-sm text-[#742410]">{importError}</p> : null}
+          {importWarning ? <p className="mt-3 text-sm text-ink-muted">{importWarning}</p> : null}
+          {importing && importStatus ? <p className="mt-3 text-sm text-ink-muted">{importStatus}</p> : null}
         </section>
 
         <PasteSheet
@@ -114,6 +118,8 @@ export default function LandingScreen(): JSX.Element {
         </div>
 
         {importError ? <p className="mt-4 text-sm text-[#742410]">{importError}</p> : null}
+        {importWarning ? <p className="mt-3 text-sm text-ink-muted">{importWarning}</p> : null}
+        {importing && importStatus ? <p className="mt-3 text-sm text-ink-muted">{importStatus}</p> : null}
       </section>
 
       <PasteSheet

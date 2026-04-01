@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import rehypeSanitize from "rehype-sanitize";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import PageIndicator from "../components/PageIndicator";
 import ReaderControls from "../components/ReaderControls";
@@ -197,13 +200,10 @@ export default function ReaderScreen(): JSX.Element {
           lineHeight: prefs.lineHeight
         }}
       >
-        <div className="space-y-7 font-reading text-theme-ink">
-          {content
-            .split(/\n{2,}/)
-            .filter(Boolean)
-            .map((paragraph, index) => (
-              <p key={`${index}-${paragraph.slice(0, 40)}`}>{paragraph}</p>
-            ))}
+        <div className="prose-monk font-reading text-theme-ink">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+            {content}
+          </ReactMarkdown>
         </div>
       </article>
 
