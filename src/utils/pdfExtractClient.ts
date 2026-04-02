@@ -3,6 +3,10 @@ import type { ImportResult } from "../types";
 const DEFAULT_PDF_EXTRACT_URL = "http://localhost:7788";
 const HEALTH_TIMEOUT_MS = 6000;
 const CONVERT_TIMEOUT_MS = 180000;
+const MAX_EMBEDDED_IMAGE_COUNT = 12;
+const MAX_EMBEDDED_IMAGE_TOTAL_BYTES = 700_000;
+const MAX_EMBEDDED_IMAGE_BYTES_PER_IMAGE = 220_000;
+const EMPTY_IMAGE_PLACEHOLDER_RE = /!\[([^\]]*)\]\(\s*\)/g;
 
 interface ServiceErrorBody {
   error?: {
@@ -18,6 +22,15 @@ interface ConvertPage {
   markdown: string;
 }
 
+interface ConvertImage {
+  page: number;
+  image_index: number;
+  mime_type?: string;
+  size_bytes?: number;
+  image_b64?: string;
+  image_b64_omitted?: string;
+}
+
 interface ConvertStats {
   llm_provider?: string;
   llm_cleaned?: number;
@@ -25,6 +38,10 @@ interface ConvertStats {
   bad_pages?: number;
   good_pages?: number;
   locally_refined?: number;
+  images_found?: number;
+  images_with_b64?: number;
+  images_b64_omitted_too_large?: number;
+  images_skipped_small?: number;
 }
 
 interface ConvertResponse {
@@ -32,6 +49,7 @@ interface ConvertResponse {
   processing_time_s?: number;
   pages: ConvertPage[];
   stats?: ConvertStats;
+  images?: ConvertImage[];
 }
 
 function stripExtension(filename: string): string {
@@ -144,6 +162,85 @@ function ensureValidConvertResponse(payload: ConvertResponse): ConvertPage[] {
   return pages.sort((left, right) => left.page - right.page);
 }
 
+function mergeImagesIntoPages(
+  pages: ConvertPage[],
+  images: ConvertImage[] | undefined
+): { merged: string[]; embeddedCount: number; skippedCount: number; placeholderFallbackCount: number } {
+  const imageLinesByPage = new Map<number, string[]>();
+  let embeddedCount = 0;
+  let totalEmbeddedBytes = 0;
+  let skippedCount = 0;
+  let placeholderFallbackCount = 0;
+
+  if (images && images.length > 0) {
+    const sortedImages = [...images].sort((left, right) => {
+      if (left.page !== right.page) {
+        return left.page - right.page;
+      }
+      return left.image_index - right.image_index;
+    });
+
+    sortedImages.forEach((image) => {
+      if (!image.image_b64) {
+        skippedCount += 1;
+        return;
+      }
+
+      const sizeBytes = image.size_bytes ?? Math.floor(image.image_b64.length * 0.75);
+      if (sizeBytes > MAX_EMBEDDED_IMAGE_BYTES_PER_IMAGE) {
+        skippedCount += 1;
+        return;
+      }
+
+      if (embeddedCount >= MAX_EMBEDDED_IMAGE_COUNT) {
+        skippedCount += 1;
+        return;
+      }
+
+      if (totalEmbeddedBytes + sizeBytes > MAX_EMBEDDED_IMAGE_TOTAL_BYTES) {
+        skippedCount += 1;
+        return;
+      }
+
+      const mimeType = image.mime_type || "image/png";
+      const line = `![PDF image — page ${image.page + 1}](data:${mimeType};base64,${image.image_b64})`;
+      const lines = imageLinesByPage.get(image.page) ?? [];
+      lines.push(line);
+      imageLinesByPage.set(image.page, lines);
+
+      embeddedCount += 1;
+      totalEmbeddedBytes += sizeBytes;
+    });
+  }
+
+  const merged = pages.map((page) => {
+    const pageImageLines = imageLinesByPage.get(page.page) ?? [];
+    let consumedImages = 0;
+
+    const withReplacedPlaceholders = page.markdown.replace(
+      EMPTY_IMAGE_PLACEHOLDER_RE,
+      (_match: string, altText: string) => {
+        const replacement = pageImageLines[consumedImages];
+        if (replacement) {
+          consumedImages += 1;
+          return replacement;
+        }
+
+        const normalizedAlt = altText.trim();
+        placeholderFallbackCount += 1;
+        return normalizedAlt ? `_${normalizedAlt}_` : "";
+      }
+    );
+
+    const remainingImages = pageImageLines.slice(consumedImages);
+    const parts = [withReplacedPlaceholders.trim(), ...remainingImages].filter(Boolean);
+
+    return parts.join("\n\n");
+  });
+
+  return { merged, embeddedCount, skippedCount, placeholderFallbackCount };
+}
+
 export async function importPdfWithService(
   file: File,
   options?: { signal?: AbortSignal; onStatus?: (status: string) => void }
@@ -163,8 +260,8 @@ export async function importPdfWithService(
   options?.onStatus?.("Uploading PDF...");
   const formData = new FormData();
   formData.append("file", file, file.name);
-  formData.append("include_images", "false");
-  formData.append("include_image_b64", "false");
+  formData.append("include_images", "true");
+  formData.append("include_image_b64", "true");
 
   options?.onStatus?.("Extracting and refining pages...");
   const converted = await fetchJsonWithTimeout<ConvertResponse>(
@@ -178,7 +275,8 @@ export async function importPdfWithService(
   );
 
   const orderedPages = ensureValidConvertResponse(converted);
-  const markdownPages = orderedPages.map((page) => page.markdown.trim()).filter(Boolean);
+  const mergedImages = mergeImagesIntoPages(orderedPages, converted.images);
+  const markdownPages = mergedImages.merged.filter(Boolean);
   const content = markdownPages.join("\n\n");
 
   if (!content.trim()) {
@@ -188,6 +286,16 @@ export async function importPdfWithService(
   const warnings: string[] = [];
   if ((converted.stats?.llm_failed ?? 0) > 0) {
     warnings.push("Some pages may have extraction artifacts.");
+  }
+
+  const imagesFound = converted.stats?.images_found ?? 0;
+  if (imagesFound > 0 && mergedImages.embeddedCount === 0) {
+    warnings.push("This PDF has images, but they were too large to embed.");
+  } else if (mergedImages.skippedCount > 0) {
+    warnings.push("Some large images were skipped to keep imports lightweight.");
+  }
+  if (mergedImages.placeholderFallbackCount > 0) {
+    warnings.push("Some figure placeholders could not be rendered as inline images.");
   }
 
   options?.onStatus?.("Finalizing import...");

@@ -218,6 +218,15 @@ body {
   background-color: var(--field-ring);
 }
 
+.prose-monk img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.25em 0;
+  border-radius: var(--radius);
+  background-color: var(--paper-soft);
+}
+
 @layer utilities {
   .fade-smooth {
     transition-duration: 220ms;

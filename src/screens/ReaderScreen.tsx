@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { defaultSchema } from "hast-util-sanitize";
 import rehypeSanitize from "rehype-sanitize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,6 +11,24 @@ import { useIdleVisibility } from "../hooks/useIdleVisibility";
 import { useAppStore } from "../state/store";
 import type { ReaderTheme } from "../types";
 import { paginateContent } from "../utils/pagination";
+
+function normalizeMarkdownPages(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter(Boolean);
+}
+
+const markdownSanitizeSchema = {
+  ...defaultSchema,
+  protocols: {
+    ...defaultSchema.protocols,
+    src: Array.from(new Set([...(defaultSchema.protocols?.src ?? ["http", "https"]), "data"]))
+  }
+};
 
 function cycleTheme(current: ReaderTheme): ReaderTheme {
   if (current === "paper") {
@@ -39,10 +58,18 @@ export default function ReaderScreen(): JSX.Element {
   );
   const documentId = document?.id ?? null;
   const documentContent = document?.content ?? "";
+  const documentMarkdownPages = useMemo(
+    () => normalizeMarkdownPages(document?.markdownPages),
+    [document?.markdownPages]
+  );
 
   const pages = useMemo(() => {
-    if (!documentContent) {
+    if (!document) {
       return [];
+    }
+
+    if (document.format === "pdf" && documentMarkdownPages.length > 0) {
+      return documentMarkdownPages;
     }
 
     return paginateContent({
@@ -50,7 +77,7 @@ export default function ReaderScreen(): JSX.Element {
       prefs,
       viewportHeight
     });
-  }, [documentContent, prefs, viewportHeight]);
+  }, [document, documentContent, documentMarkdownPages, prefs, viewportHeight]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const timeAnchorRef = useRef(Date.now());
@@ -175,6 +202,7 @@ export default function ReaderScreen(): JSX.Element {
   }
 
   const content = pages[Math.max(0, currentPage - 1)] ?? "";
+  const hasVisibleContent = content.trim().length > 0;
 
   return (
     <main className="min-h-screen px-6 py-16" onMouseMove={ping}>
@@ -201,9 +229,16 @@ export default function ReaderScreen(): JSX.Element {
         }}
       >
         <div className="prose-monk font-reading text-theme-ink">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-            {content}
-          </ReactMarkdown>
+          {hasVisibleContent ? (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[[rehypeSanitize, markdownSanitizeSchema]]}
+            >
+              {content}
+            </ReactMarkdown>
+          ) : (
+            <p className="text-sm text-ink-muted">No readable content on this page.</p>
+          )}
         </div>
       </article>
 
