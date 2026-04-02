@@ -3,10 +3,13 @@ import type { ImportResult } from "../types";
 const DEFAULT_PDF_EXTRACT_URL = "http://localhost:7788";
 const HEALTH_TIMEOUT_MS = 6000;
 const CONVERT_TIMEOUT_MS = 180000;
-const MAX_EMBEDDED_IMAGE_COUNT = 12;
-const MAX_EMBEDDED_IMAGE_TOTAL_BYTES = 700_000;
-const MAX_EMBEDDED_IMAGE_BYTES_PER_IMAGE = 220_000;
-const EMPTY_IMAGE_PLACEHOLDER_RE = /!\[([^\]]*)\]\(\s*\)/g;
+const MAX_EMBEDDED_IMAGE_COUNT = 24;
+const MAX_EMBEDDED_IMAGE_TOTAL_BYTES = 1_000_000;
+const MAX_EMBEDDED_IMAGE_BYTES_PER_IMAGE = 300_000;
+const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^)]*)\)/g;
+const STANDALONE_IMAGE_PLACEHOLDER_RE =
+  /^\s*(?:[*_`>#-]+\s*)*(?:\[)?(?:image|figure|fig\.?)\s*[:#-]?\s*\d+[a-z]?(?:\])?\s*(?:[*_`]+)?\s*$/i;
+const GENERIC_IMAGE_LABEL_RE = /^(?:image|figure|fig\.?)(?:\s*[:#-]?\s*\d+[a-z]?)?$/i;
 
 interface ServiceErrorBody {
   error?: {
@@ -29,6 +32,7 @@ interface ConvertImage {
   size_bytes?: number;
   image_b64?: string;
   image_b64_omitted?: string;
+  rects?: number[][];
 }
 
 interface ConvertStats {
@@ -162,11 +166,71 @@ function ensureValidConvertResponse(payload: ConvertResponse): ConvertPage[] {
   return pages.sort((left, right) => left.page - right.page);
 }
 
+function normalizePlaceholderLabel(value: string): string {
+  return value
+    .replace(/[*_`~]/g, "")
+    .replace(/^\[|\]$/g, "")
+    .trim();
+}
+
+function isGenericImageLabel(value: string): boolean {
+  const normalized = normalizePlaceholderLabel(value).toLowerCase();
+  return normalized.length > 0 && GENERIC_IMAGE_LABEL_RE.test(normalized);
+}
+
+function buildImageAltText(rawAlt: string, pageNumber: number): string {
+  const normalized = normalizePlaceholderLabel(rawAlt);
+  if (!normalized || isGenericImageLabel(normalized)) {
+    return `PDF image — page ${pageNumber + 1}`;
+  }
+
+  return normalized.replace(/\]/g, "");
+}
+
+function shouldReplaceMarkdownImageTarget(target: string): boolean {
+  const normalized = target.trim().toLowerCase();
+  if (!normalized || normalized === "#" || normalized === "about:blank") {
+    return true;
+  }
+  if (normalized.startsWith("javascript:")) {
+    return true;
+  }
+  if (isGenericImageLabel(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+function imagePlacementKey(image: ConvertImage): { top: number; left: number } {
+  if (!Array.isArray(image.rects) || image.rects.length === 0) {
+    return { top: Number.POSITIVE_INFINITY, left: Number.POSITIVE_INFINITY };
+  }
+
+  let top = Number.POSITIVE_INFINITY;
+  let left = Number.POSITIVE_INFINITY;
+  image.rects.forEach((rect) => {
+    if (!Array.isArray(rect) || rect.length < 2) {
+      return;
+    }
+
+    const rectLeft = Number(rect[0]);
+    const rectTop = Number(rect[1]);
+    if (Number.isFinite(rectTop)) {
+      top = Math.min(top, rectTop);
+    }
+    if (Number.isFinite(rectLeft)) {
+      left = Math.min(left, rectLeft);
+    }
+  });
+
+  return { top, left };
+}
+
 function mergeImagesIntoPages(
   pages: ConvertPage[],
   images: ConvertImage[] | undefined
 ): { merged: string[]; embeddedCount: number; skippedCount: number; placeholderFallbackCount: number } {
-  const imageLinesByPage = new Map<number, string[]>();
+  const imageLinesByPage = new Map<number, Array<{ line: string; imageIndex: number }>>();
   let embeddedCount = 0;
   let totalEmbeddedBytes = 0;
   let skippedCount = 0;
@@ -176,6 +240,15 @@ function mergeImagesIntoPages(
     const sortedImages = [...images].sort((left, right) => {
       if (left.page !== right.page) {
         return left.page - right.page;
+      }
+
+      const leftPos = imagePlacementKey(left);
+      const rightPos = imagePlacementKey(right);
+      if (leftPos.top !== rightPos.top) {
+        return leftPos.top - rightPos.top;
+      }
+      if (leftPos.left !== rightPos.left) {
+        return leftPos.left - rightPos.left;
       }
       return left.image_index - right.image_index;
     });
@@ -205,7 +278,7 @@ function mergeImagesIntoPages(
       const mimeType = image.mime_type || "image/png";
       const line = `![PDF image — page ${image.page + 1}](data:${mimeType};base64,${image.image_b64})`;
       const lines = imageLinesByPage.get(image.page) ?? [];
-      lines.push(line);
+      lines.push({ line, imageIndex: image.image_index });
       imageLinesByPage.set(image.page, lines);
 
       embeddedCount += 1;
@@ -217,23 +290,61 @@ function mergeImagesIntoPages(
     const pageImageLines = imageLinesByPage.get(page.page) ?? [];
     let consumedImages = 0;
 
-    const withReplacedPlaceholders = page.markdown.replace(
-      EMPTY_IMAGE_PLACEHOLDER_RE,
-      (_match: string, altText: string) => {
-        const replacement = pageImageLines[consumedImages];
+    const takeNextImage = (requestedAltText: string): string | null => {
+      const replacement = pageImageLines[consumedImages];
+      if (!replacement) {
+        return null;
+      }
+
+      consumedImages += 1;
+      const line = replacement.line;
+      const match = line.match(/^!\[[^\]]*\]\((.*)\)$/);
+      const target = match ? match[1] : "";
+      const alt = buildImageAltText(requestedAltText, page.page);
+      return `![${alt}](${target})`;
+    };
+
+    const withReplacedMarkdownPlaceholders = page.markdown.replace(
+      MARKDOWN_IMAGE_RE,
+      (match: string, altText: string, target: string) => {
+        if (!shouldReplaceMarkdownImageTarget(target)) {
+          return match;
+        }
+
+        const replacement = takeNextImage(altText);
         if (replacement) {
-          consumedImages += 1;
           return replacement;
         }
 
-        const normalizedAlt = altText.trim();
+        const normalizedAlt = normalizePlaceholderLabel(altText);
         placeholderFallbackCount += 1;
-        return normalizedAlt ? `_${normalizedAlt}_` : "";
+        if (!normalizedAlt || isGenericImageLabel(normalizedAlt)) {
+          return "";
+        }
+        return `_${normalizedAlt}_`;
       }
     );
 
-    const remainingImages = pageImageLines.slice(consumedImages);
-    const parts = [withReplacedPlaceholders.trim(), ...remainingImages].filter(Boolean);
+    const withReplacedStandalonePlaceholders = withReplacedMarkdownPlaceholders
+      .split("\n")
+      .map((line) => {
+        if (!STANDALONE_IMAGE_PLACEHOLDER_RE.test(line.trim())) {
+          return line;
+        }
+
+        const replacement = takeNextImage(line);
+        if (replacement) {
+          return replacement;
+        }
+
+        placeholderFallbackCount += 1;
+        return "";
+      })
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n");
+
+    const remainingImages = pageImageLines.slice(consumedImages).map((entry) => entry.line);
+    const parts = [withReplacedStandalonePlaceholders.trim(), ...remainingImages].filter(Boolean);
 
     return parts.join("\n\n");
   });
